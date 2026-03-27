@@ -13,8 +13,8 @@ OpenCleaner is a cross-platform system optimization and cleaning application tha
 ## GUI highlights
 
 - Native desktop application built with Tkinter/ttk
-- Distinctive retro-futuristic command-center aesthetic
-- High-contrast telemetry table with one-click arming/disarming per row
+- Modernized layout and styling
+- Interactive category table with per-row selection toggle
 - Select All / Clear Selection controls
 - Status messages and scan progress indicator
 
