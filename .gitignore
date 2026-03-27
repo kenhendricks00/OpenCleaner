@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Local env
+.venv/
+
+# PyInstaller artifacts
+build/
+dist/
+*.spec.bak
