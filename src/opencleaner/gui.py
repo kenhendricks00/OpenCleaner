@@ -8,84 +8,240 @@ from .core import ScanItem, clean_items, human_readable_size, run_scan
 
 
 class OpenCleanerApp(tk.Tk):
+    """OpenCleaner desktop application.
+
+    Aesthetic direction: retro-futuristic command center with high-contrast accents,
+    elevated typography, and clear information hierarchy.
+    """
+
+    BG = "#0a0f1f"
+    SURFACE = "#121a33"
+    SURFACE_ELEVATED = "#192447"
+    PANEL_BORDER = "#32406d"
+    ACCENT = "#3af2cf"
+    ACCENT_SOFT = "#1bc6a8"
+    TEXT_MAIN = "#e7efff"
+    TEXT_MUTED = "#9fb2d9"
     def __init__(self) -> None:
         super().__init__()
         self.title("OpenCleaner")
-        self.geometry("900x560")
-        self.minsize(860, 520)
+        self.geometry("1080x680")
+        self.minsize(980, 620)
+        self.configure(bg=self.BG)
 
         self.report_items: list[ScanItem] = []
         self.selection_vars: dict[str, tk.BooleanVar] = {}
         self.row_to_item: dict[str, ScanItem] = {}
         self._scan_in_progress = False
 
-        self._build_ui()
+        self.total_var = tk.StringVar(value="Potential reclaimable space: --")
+        self.status_var = tk.StringVar(value="System standing by. Run scan to detect reclaimable files.")
 
-    def _build_ui(self) -> None:
+        self._configure_styles()
+        self._build_ui()
+        self.bind("<Control-r>", lambda _event: self.run_scan())
+        self.bind("<Control-l>", lambda _event: self.clean_selected())
+
+    def _configure_styles(self) -> None:
         style = ttk.Style(self)
         style.theme_use("clam")
 
-        header = ttk.Frame(self, padding=(16, 12))
+        style.configure("Root.TFrame", background=self.BG)
+        style.configure("Surface.TFrame", background=self.SURFACE)
+        style.configure("Elevated.TFrame", background=self.SURFACE_ELEVATED)
+
+        style.configure(
+            "Headline.TLabel",
+            background=self.BG,
+            foreground=self.TEXT_MAIN,
+            font=("Bahnschrift", 28, "bold"),
+        )
+        style.configure(
+            "Subhead.TLabel",
+            background=self.BG,
+            foreground=self.TEXT_MUTED,
+            font=("Cascadia Code", 11),
+        )
+        style.configure(
+            "Stat.TLabel",
+            background=self.SURFACE_ELEVATED,
+            foreground=self.ACCENT,
+            font=("Bahnschrift", 14, "bold"),
+        )
+        style.configure(
+            "StatCaption.TLabel",
+            background=self.SURFACE_ELEVATED,
+            foreground=self.TEXT_MUTED,
+            font=("Cascadia Code", 9),
+        )
+        style.configure(
+            "Footer.TLabel",
+            background=self.BG,
+            foreground=self.TEXT_MUTED,
+            font=("Cascadia Code", 10),
+        )
+
+        style.configure(
+            "Neon.TButton",
+            font=("Bahnschrift", 11, "bold"),
+            padding=(16, 10),
+            foreground=self.BG,
+            background=self.ACCENT,
+            borderwidth=0,
+        )
+        style.map(
+            "Neon.TButton",
+            background=[("disabled", "#3b4d58"), ("active", "#66ffe1")],
+            foreground=[("disabled", "#a7c3bc"), ("active", self.BG)],
+        )
+
+        style.configure(
+            "Ghost.TButton",
+            font=("Bahnschrift", 11),
+            padding=(14, 10),
+            foreground=self.TEXT_MAIN,
+            background=self.SURFACE,
+            bordercolor=self.PANEL_BORDER,
+            borderwidth=1,
+        )
+        style.map(
+            "Ghost.TButton",
+            background=[("disabled", "#131a2d"), ("active", "#243258")],
+            foreground=[("disabled", "#5d6d95"), ("active", self.TEXT_MAIN)],
+        )
+
+        style.configure(
+            "Futuristic.Horizontal.TProgressbar",
+            troughcolor=self.SURFACE,
+            background=self.ACCENT,
+            bordercolor=self.PANEL_BORDER,
+            lightcolor=self.ACCENT,
+            darkcolor=self.ACCENT_SOFT,
+            thickness=10,
+        )
+
+        style.configure(
+            "Cleaner.Treeview",
+            background=self.SURFACE,
+            fieldbackground=self.SURFACE,
+            foreground=self.TEXT_MAIN,
+            bordercolor=self.PANEL_BORDER,
+            rowheight=34,
+            font=("Cascadia Code", 10),
+        )
+        style.configure(
+            "Cleaner.Treeview.Heading",
+            background=self.SURFACE_ELEVATED,
+            foreground=self.TEXT_MAIN,
+            font=("Bahnschrift", 11, "bold"),
+            relief="flat",
+        )
+        style.map("Cleaner.Treeview", background=[("selected", "#2e3d6d")])
+        style.map("Cleaner.Treeview.Heading", background=[("active", "#27396c")])
+
+    def _build_ui(self) -> None:
+        shell = ttk.Frame(self, style="Root.TFrame", padding=20)
+        shell.pack(fill="both", expand=True)
+
+        self._build_header(shell)
+        self._build_controls(shell)
+        self._build_table(shell)
+
+        ttk.Label(shell, textvariable=self.status_var, style="Footer.TLabel", padding=(6, 12, 6, 2)).pack(fill="x")
+
+    def _build_header(self, parent: ttk.Frame) -> None:
+        header = ttk.Frame(parent, style="Root.TFrame")
         header.pack(fill="x")
 
-        ttk.Label(header, text="OpenCleaner", font=("Segoe UI", 22, "bold")).pack(side="left")
+        left = ttk.Frame(header, style="Root.TFrame")
+        left.pack(side="left", fill="x", expand=True)
+
+        ttk.Label(left, text="OPENCLEANER", style="Headline.TLabel").pack(anchor="w")
         ttk.Label(
-            header,
-            text="Optimize storage and clean unnecessary files safely.",
-            font=("Segoe UI", 10),
-        ).pack(side="left", padx=(10, 0), pady=(8, 0))
+            left,
+            text="Retro-futuristic workstation for cache and storage hygiene",
+            style="Subhead.TLabel",
+            padding=(2, 2, 2, 10),
+        ).pack(anchor="w")
 
-        controls = ttk.Frame(self, padding=(16, 2))
-        controls.pack(fill="x")
+        stat_card = ttk.Frame(header, style="Elevated.TFrame", padding=(16, 12))
+        stat_card.pack(side="right")
+        ttk.Label(stat_card, text="SPACE INTELLIGENCE", style="StatCaption.TLabel").pack(anchor="e")
+        ttk.Label(stat_card, textvariable=self.total_var, style="Stat.TLabel").pack(anchor="e", pady=(2, 0))
 
-        self.scan_button = ttk.Button(controls, text="Scan", command=self.run_scan)
+    def _build_controls(self, parent: ttk.Frame) -> None:
+        wrap = ttk.Frame(parent, style="Surface.TFrame", padding=14)
+        wrap.pack(fill="x", pady=(6, 10))
+
+        self.scan_button = ttk.Button(wrap, text="Run Deep Scan", style="Neon.TButton", command=self.run_scan)
         self.scan_button.pack(side="left")
 
-        self.clean_button = ttk.Button(controls, text="Clean Selected", command=self.clean_selected, state="disabled")
-        self.clean_button.pack(side="left", padx=8)
+        self.clean_button = ttk.Button(
+            wrap,
+            text="Clean Selected",
+            style="Ghost.TButton",
+            command=self.clean_selected,
+            state="disabled",
+        )
+        self.clean_button.pack(side="left", padx=(10, 0))
 
-        self.select_all_button = ttk.Button(controls, text="Select All", command=self.select_all, state="disabled")
-        self.select_all_button.pack(side="left")
+        self.select_all_button = ttk.Button(
+            wrap,
+            text="Select All",
+            style="Ghost.TButton",
+            command=self.select_all,
+            state="disabled",
+        )
+        self.select_all_button.pack(side="left", padx=(10, 0))
 
         self.clear_selection_button = ttk.Button(
-            controls,
-            text="Clear Selection",
+            wrap,
+            text="Clear",
+            style="Ghost.TButton",
             command=self.clear_selection,
             state="disabled",
         )
-        self.clear_selection_button.pack(side="left", padx=8)
+        self.clear_selection_button.pack(side="left", padx=(10, 0))
 
-        self.total_var = tk.StringVar(value="Potential reclaimable space: --")
-        ttk.Label(controls, textvariable=self.total_var, font=("Segoe UI", 10, "bold")).pack(side="right")
+        self.progress = ttk.Progressbar(wrap, style="Futuristic.Horizontal.TProgressbar", mode="indeterminate")
+        self.progress.pack(side="right", fill="x", expand=True, padx=(20, 4), ipady=1)
 
-        progress_wrap = ttk.Frame(self, padding=(16, 4))
-        progress_wrap.pack(fill="x")
-        self.progress = ttk.Progressbar(progress_wrap, mode="indeterminate")
-        self.progress.pack(fill="x")
-
-        body = ttk.Frame(self, padding=(16, 8))
-        body.pack(fill="both", expand=True)
+    def _build_table(self, parent: ttk.Frame) -> None:
+        table_panel = tk.Frame(
+            parent,
+            bg=self.SURFACE,
+            highlightbackground=self.PANEL_BORDER,
+            highlightthickness=1,
+            bd=0,
+        )
+        table_panel.pack(fill="both", expand=True)
 
         columns = ("enabled", "category", "targets", "size")
-        self.tree = ttk.Treeview(body, columns=columns, show="headings", selectmode="none")
-        self.tree.heading("enabled", text="Selected")
-        self.tree.heading("category", text="Category")
-        self.tree.heading("targets", text="Target Paths")
-        self.tree.heading("size", text="Estimated")
-        self.tree.column("enabled", width=70, anchor="center")
-        self.tree.column("category", width=200, anchor="w")
-        self.tree.column("targets", width=500, anchor="w")
-        self.tree.column("size", width=100, anchor="e")
+        self.tree = ttk.Treeview(
+            table_panel,
+            columns=columns,
+            show="headings",
+            selectmode="none",
+            style="Cleaner.Treeview",
+        )
+        self.tree.heading("enabled", text="ARMED")
+        self.tree.heading("category", text="MODULE")
+        self.tree.heading("targets", text="TARGET LOCATIONS")
+        self.tree.heading("size", text="EST. SIZE")
 
-        scrollbar = ttk.Scrollbar(body, orient="vertical", command=self.tree.yview)
+        self.tree.column("enabled", width=90, anchor="center")
+        self.tree.column("category", width=240, anchor="w")
+        self.tree.column("targets", width=560, anchor="w")
+        self.tree.column("size", width=130, anchor="e")
+
+        scrollbar = ttk.Scrollbar(table_panel, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
         self.tree.bind("<Button-1>", self._toggle_row_selection)
-
-        self.status_var = tk.StringVar(value="Ready. Click Scan to analyze cleanable files.")
-        ttk.Label(self, textvariable=self.status_var, padding=(16, 8), foreground="#555").pack(fill="x")
+        self.tree.tag_configure("evenrow", background=self.SURFACE)
+        self.tree.tag_configure("oddrow", background="#162141")
 
     def _set_actions_state(self, enabled: bool) -> None:
         state = "normal" if enabled else "disabled"
@@ -93,15 +249,24 @@ class OpenCleanerApp(tk.Tk):
         self.select_all_button.configure(state=state)
         self.clear_selection_button.configure(state=state)
 
+    def _update_clean_button_state(self) -> None:
+        if self._scan_in_progress:
+            self.clean_button.configure(state="disabled")
+            return
+        enabled = any(v.get() for v in self.selection_vars.values()) and bool(self.selection_vars)
+        self.clean_button.configure(state="normal" if enabled else "disabled")
+
     def _toggle_scan_state(self, scanning: bool) -> None:
         self._scan_in_progress = scanning
         if scanning:
             self.scan_button.configure(state="disabled")
-            self.progress.start(8)
-            self.status_var.set("Scanning system locations...")
+            self.progress.start(9)
+            self.status_var.set("Sweeping filesystem signatures... please stand by.")
+            self._update_clean_button_state()
         else:
             self.scan_button.configure(state="normal")
             self.progress.stop()
+            self._update_clean_button_state()
 
     def run_scan(self) -> None:
         if self._scan_in_progress:
@@ -110,7 +275,11 @@ class OpenCleanerApp(tk.Tk):
         self._toggle_scan_state(True)
 
         def worker() -> None:
-            report = run_scan()
+            try:
+                report = run_scan()
+            except Exception as exc:  # broad catch to avoid background-thread UI hangs
+                self.after(0, lambda: self._handle_scan_error(exc))
+                return
             self.after(0, lambda: self._render_scan(report.items, report.total_bytes))
 
         threading.Thread(target=worker, daemon=True).start()
@@ -130,7 +299,8 @@ class OpenCleanerApp(tk.Tk):
                 "",
                 "end",
                 iid=row_id,
-                values=("✓", item.label, ", ".join(str(p) for p in item.paths), human_readable_size(item.bytes_size)),
+                values=("●", item.label, "  |  ".join(str(p) for p in item.paths), human_readable_size(item.bytes_size)),
+                tags=("oddrow",) if idx % 2 else ("evenrow",),
             )
 
         self.total_var.set(f"Potential reclaimable space: {human_readable_size(total_bytes)}")
@@ -138,7 +308,17 @@ class OpenCleanerApp(tk.Tk):
         has_data = bool(items)
         self._set_actions_state(has_data)
         self._toggle_scan_state(False)
-        self.status_var.set(f"Scan complete. Found {len(items)} categories.")
+        self._update_clean_button_state()
+        if has_data:
+            self.status_var.set(f"Scan complete: {len(items)} cleanup modules armed.")
+        else:
+            self.status_var.set("Scan complete: no cleanable categories detected.")
+
+    def _handle_scan_error(self, exc: Exception) -> None:
+        self._set_actions_state(False)
+        self._toggle_scan_state(False)
+        self.status_var.set("Scan failed. See details in dialog.")
+        messagebox.showerror("OpenCleaner scan error", f"Unable to complete scan.\n\nDetails: {exc}")
 
     def _toggle_row_selection(self, event: tk.Event) -> None:
         if self._scan_in_progress:
@@ -154,19 +334,22 @@ class OpenCleanerApp(tk.Tk):
             return
 
         variable.set(not variable.get())
-        self.tree.set(row_id, "enabled", "✓" if variable.get() else "")
+        self.tree.set(row_id, "enabled", "●" if variable.get() else "○")
+        self._update_clean_button_state()
 
     def select_all(self) -> None:
         for row_id, variable in self.selection_vars.items():
             variable.set(True)
-            self.tree.set(row_id, "enabled", "✓")
-        self.status_var.set("All categories selected.")
+            self.tree.set(row_id, "enabled", "●")
+        self.status_var.set("All modules armed for cleanup.")
+        self._update_clean_button_state()
 
     def clear_selection(self) -> None:
         for row_id, variable in self.selection_vars.items():
             variable.set(False)
-            self.tree.set(row_id, "enabled", "")
-        self.status_var.set("Selection cleared.")
+            self.tree.set(row_id, "enabled", "○")
+        self.status_var.set("All modules disarmed.")
+        self._update_clean_button_state()
 
     def _selected_items(self) -> list[ScanItem]:
         selected: list[ScanItem] = []
@@ -181,23 +364,24 @@ class OpenCleanerApp(tk.Tk):
 
         selected = self._selected_items()
         if not selected:
-            messagebox.showinfo("OpenCleaner", "Select at least one category to clean.")
+            messagebox.showinfo("OpenCleaner", "Arm at least one module before cleanup.")
             return
 
         count = len(selected)
         confirm = messagebox.askyesno(
             "Confirm cleanup",
-            f"OpenCleaner will clean {count} selected categories. Continue?",
+            f"Execute cleanup for {count} armed modules?",
+            icon="warning",
         )
         if not confirm:
             return
 
         deleted, reclaimed = clean_items(selected)
         self.status_var.set(
-            f"Cleanup complete. Removed {deleted} entries and reclaimed {human_readable_size(reclaimed)}."
+            f"Cleanup complete: removed {deleted} entries / reclaimed {human_readable_size(reclaimed)}."
         )
         messagebox.showinfo(
             "Cleanup complete",
-            f"Deleted {deleted} entries and reclaimed approximately {human_readable_size(reclaimed)}.",
+            f"Removed {deleted} entries and reclaimed approximately {human_readable_size(reclaimed)}.",
         )
         self.run_scan()
